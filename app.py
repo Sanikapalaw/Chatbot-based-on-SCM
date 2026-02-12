@@ -1,48 +1,55 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="SCM Gemini Assistant", page_icon="🚚")
+st.set_page_config(page_title="SCM AI Assistant", page_icon="🚚")
 
-st.title("🚚 SCM AI Assistant (Gemini)")
+st.title("🚚 SCM AI Assistant (Gemini API)")
 
-# ---------------- GEMINI CONFIG ----------------
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+API_KEY = st.secrets["GEMINI_API_KEY"]
 
-model = genai.GenerativeModel("gemini-1.5-flash")
+API_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
 SYSTEM_PROMPT = """
 You are a Supply Chain Management expert assistant.
 Keep conversation continuous and remember context.
-Explain logistics and SCM topics simply.
+Explain logistics and SCM topics simply and professionally.
 """
 
 # ---------------- SESSION MEMORY ----------------
-if "chat" not in st.session_state:
-    st.session_state.chat = model.start_chat(
-        history=[
-            {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": ["Understood. I will act as an SCM assistant."]}
-        ]
-    )
-
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {"role": "user", "content": SYSTEM_PROMPT}
+    ]
 
 # ---------------- DISPLAY CHAT HISTORY ----------------
-for msg in st.session_state.messages:
+for msg in st.session_state.messages[1:]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ---------------- RESPONSE FUNCTION ----------------
+# ---------------- GEMINI RESPONSE FUNCTION ----------------
 def generate_response(user_text):
-
-    response = st.session_state.chat.send_message(user_text)
-    reply = response.text
 
     st.session_state.messages.append(
         {"role": "user", "content": user_text}
     )
+
+    # Build conversation history
+    contents = []
+    for msg in st.session_state.messages:
+        contents.append({
+            "role": "user" if msg["role"] == "user" else "model",
+            "parts": [{"text": msg["content"]}]
+        })
+
+    payload = {
+        "contents": contents
+    }
+
+    response = requests.post(API_URL, json=payload)
+    result = response.json()
+
+    reply = result["candidates"][0]["content"]["parts"][0]["text"]
 
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
@@ -62,6 +69,7 @@ if user_input:
 
     with st.chat_message("assistant"):
         st.markdown(reply)
+
 
 # ---------------- SUGGESTED QUESTIONS ----------------
 st.divider()
