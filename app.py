@@ -1,91 +1,70 @@
 import streamlit as st
 
-st.set_page_config(page_title="Dynamic SCM Bot", page_icon="🚚")
+# 1. Page & Branding
+st.set_page_config(page_title="SCM Pro Assistant", page_icon="🚚", layout="centered")
 
-# 1. UPDATED Knowledge Base with missing branches
-scm_branches = {
-    "START": ("How can I help you today? Select a major supply chain area to explore:", 
-              ["Procurement", "Inventory", "Logistics"]),
-    
-    # PROCUREMENT BRANCH
-    "Procurement": ("Procurement is about sourcing goods. What specifically interests you?", 
-                    ["Vendor Selection", "Negotiation Tips", "Purchase Orders"]),
-    "Vendor Selection": ("Choosing the right vendor involves looking at cost, quality, and reliability. Always check their lead times!", ["Back to Procurement", "Home"]),
-    "Negotiation Tips": ("Good negotiation is about 'win-win'. Focus on long-term partnerships rather than just the lowest price.", ["Back to Procurement", "Home"]),
-    "Purchase Orders": ("A PO is a legally binding document sent by a buyer to a seller indicating types, quantities, and agreed prices.", ["Back to Procurement", "Home"]),
+st.title("🚚 SCM Professional Assistant")
+st.markdown("---")
 
-    # INVENTORY BRANCH
-    "Inventory": ("Inventory management balances cost and availability. Want to learn about:", 
-                  ["JIT Strategy", "Safety Stock", "ABC Analysis"]),
-    "JIT Strategy": ("Just-In-Time (JIT) reduces waste by receiving goods only as needed. It requires high supplier reliability.", ["Back to Inventory", "Home"]),
-    "Safety Stock": ("Safety stock is your 'insurance' inventory for demand spikes or supply delays.", ["Back to Inventory", "Home"]),
-    "ABC Analysis": ("ABC Analysis divides inventory into three categories: A (high value), B (moderate), and C (low value).", ["Back to Inventory", "Home"]),
-    
-    # LOGISTICS BRANCH
-    "Logistics": ("Logistics covers movement and storage. Choose a sub-topic:", 
-                  ["3PL Services", "Route Optimization", "Reverse Logistics"]),
-    "3PL Services": ("3PL providers handle your shipping and warehousing so you can focus on sales.", ["Back to Logistics", "Home"]),
-    "Route Optimization": ("This uses math to find the shortest, fastest, and cheapest way to deliver goods.", ["Back to Logistics", "Home"]),
-    "Reverse Logistics": ("This is the process of handling returns, recycling, and refurbishing goods.", ["Back to Logistics", "Home"]),
-
-    "Home": ("Returning to start...", ["Procurement", "Inventory", "Logistics"])
+# 2. Professional Knowledge Base
+scm_knowledge = {
+    "Negotiation Tips": "Focus on win-win outcomes and long-term partnerships rather than just the lowest price.",
+    "JIT Strategy": "Just-In-Time (JIT) reduces waste by receiving goods only as needed, requiring high supplier reliability.",
+    "Safety Stock": "This is your 'insurance' inventory for demand spikes or supply delays.",
+    "3PL Services": "Third-Party Logistics (3PL) providers handle shipping and warehousing so you can focus on core sales.",
+    "Reverse Logistics": "The process of handling returns, recycling, and refurbishing goods efficiently."
 }
 
-# Mapping for "Back" buttons
-back_map = {
-    "Back to Procurement": "Procurement",
-    "Back to Inventory": "Inventory", 
-    "Back to Logistics": "Logistics"
-}
-
-# 2. Initialize State
-if "current_step" not in st.session_state:
-    st.session_state.current_step = "START"
+# 3. Initialize Professional Session State
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {"role": "assistant", "content": "How can I help you today? You can select a quick topic below or type your own question.", "avatar": "🤖"}
+    ]
 
-# 3. Handle Button Clicks
-def handle_click(choice):
-    next_step = back_map.get(choice, choice)
-    
-    # Check if the step exists before moving to avoid the KeyError
-    if next_step in scm_branches:
-        st.session_state.current_step = next_step
-        answer, _ = scm_branches[next_step]
-        st.session_state.messages.append({"role": "user", "content": choice})
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-    else:
-        st.session_state.messages.append({"role": "assistant", "content": "I'm still learning about that topic!"})
-
-# 4. UI Layout
-st.title("🚚 Dynamic SCM Assistant")
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
-
-# 5. Display Dynamic Buttons
-# Using .get() to provide a fallback and prevent the KeyError crash
-current_data = scm_branches.get(st.session_state.current_step, scm_branches["START"])
-current_text, options = current_data
-
-if st.session_state.current_step == "START" and not st.session_state.messages:
-    with st.chat_message("assistant"):
-        st.write(current_text)
-
-st.write("---")
-st.write("### Choose an option to continue:")
-cols = st.columns(len(options))
-
-for i, option in enumerate(options):
-    with cols[i]:
-        if st.button(option, key=option):
-            handle_click(option)
-            st.rerun()
-
-# 6. Sidebar Reset
+# 4. Sidebar Controls
 with st.sidebar:
-    if st.button("Restart Bot"):
-        st.session_state.current_step = "START"
-        st.session_state.messages = []
+    st.header("⚙️ Settings")
+    if st.button("🗑️ Clear Chat History"):
+        st.session_state.messages = [{"role": "assistant", "content": "Chat cleared. How can I help?", "avatar": "🤖"}]
         st.rerun()
+    st.info("Status: Local Mode (No API Required)")
+
+# 5. Display Continuous Chat History with Avatars
+for msg in st.session_state.messages:
+    # Preset avatars for user and custom emoji for assistant
+    avatar = msg.get("avatar") if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar):
+        st.markdown(msg["content"])
+
+# 6. Quick Action Buttons (The "Branching" Options)
+st.write("---")
+st.caption("Quick Topics:")
+cols = st.columns(3)
+quick_picks = list(scm_knowledge.keys())[:3] # Show first 3 as buttons
+
+selected_button = None
+for i, topic in enumerate(quick_picks):
+    if cols[i].button(topic, use_container_width=True):
+        selected_button = topic
+
+# 7. Professional Chat Input
+user_input = st.chat_input("Ask about logistics, inventory, or procurement...")
+
+# Priority logic: Use button if clicked, otherwise use typed input
+final_prompt = selected_button if selected_button else user_input
+
+if final_prompt:
+    # User Message
+    st.session_state.messages.append({"role": "user", "content": final_prompt})
+    with st.chat_message("user"):
+        st.markdown(final_prompt)
+
+    # Professional Response Logic
+    with st.chat_message("assistant", avatar="🤖"):
+        # Search dictionary for match, else provide a fallback
+        response = scm_knowledge.get(final_prompt, "I'm specialized in core SCM areas. Try asking about JIT, 3PL, or Safety Stock!")
+        st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response, "avatar": "🤖"})
+    
+    # Rerun to clear the button state
+    st.rerun()
