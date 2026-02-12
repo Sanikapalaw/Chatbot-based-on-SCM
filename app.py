@@ -22,10 +22,7 @@ for msg in st.session_state.messages[1:]:
         st.write(msg["content"])
 
 def ask_ai(question):
-
-    st.session_state.messages.append(
-        {"role": "user", "content": question}
-    )
+    st.session_state.messages.append({"role": "user", "content": question})
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -37,25 +34,19 @@ def ask_ai(question):
         "messages": st.session_state.messages
     }
 
-    res = requests.post(url, headers=headers, json=payload)
-    data = res.json()
+    try:
+        res = requests.post(url, headers=headers, json=payload)
+        res.raise_for_status() # This will trigger the 'except' block if the API returns an error
+        data = res.json()
+        
+        # Check if 'choices' is actually in the response
+        if "choices" in data:
+            answer = data["choices"][0]["message"]["content"]
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+            return answer
+        else:
+            return f"API Error: {data.get('error', 'Unknown error occurred')}"
 
-    answer = data["choices"][0]["message"]["content"]
+    except requests.exceptions.RequestException as e:
+        return f"Connection Error: {str(e)}"
 
-    st.session_state.messages.append(
-        {"role": "assistant", "content": answer}
-    )
-
-    return answer
-
-
-user_input = st.chat_input("Ask SCM question...")
-
-if user_input:
-    with st.chat_message("user"):
-        st.write(user_input)
-
-    reply = ask_ai(user_input)
-
-    with st.chat_message("assistant"):
-        st.write(reply)
