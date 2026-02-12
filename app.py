@@ -11,39 +11,38 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# ---------------- SYSTEM PROMPT ----------------
 SYSTEM_PROMPT = """
 You are a Supply Chain Management expert assistant.
-Keep conversation continuous and remember previous context.
-Explain logistics, inventory, warehouse and supply chain
-concepts in simple professional language.
+Keep conversation continuous and remember context.
+Explain logistics and SCM topics simply.
 """
 
 # ---------------- SESSION MEMORY ----------------
+if "chat" not in st.session_state:
+    st.session_state.chat = model.start_chat(
+        history=[
+            {"role": "user", "parts": [SYSTEM_PROMPT]},
+            {"role": "model", "parts": ["Understood. I will act as an SCM assistant."]}
+        ]
+    )
+
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "user", "content": SYSTEM_PROMPT}
-    ]
+    st.session_state.messages = []
 
 # ---------------- DISPLAY CHAT HISTORY ----------------
-for msg in st.session_state.messages[1:]:
+for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ---------------- FUNCTION FOR RESPONSE ----------------
+# ---------------- RESPONSE FUNCTION ----------------
 def generate_response(user_text):
+
+    response = st.session_state.chat.send_message(user_text)
+    reply = response.text
 
     st.session_state.messages.append(
         {"role": "user", "content": user_text}
     )
-
-    # Build conversation history
-    history = ""
-    for m in st.session_state.messages:
-        history += f"{m['role']}: {m['content']}\n"
-
-    response = model.generate_content(history)
-    reply = response.text
 
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
@@ -71,8 +70,8 @@ st.subheader("Suggested Questions")
 suggestions = [
     "What causes delivery delays?",
     "How to reduce logistics cost?",
-    "What are important SCM KPIs?",
-    "Explain demand forecasting in logistics"
+    "What are SCM KPIs?",
+    "Explain demand forecasting"
 ]
 
 cols = st.columns(2)
