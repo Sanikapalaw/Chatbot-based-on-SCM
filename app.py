@@ -1,65 +1,76 @@
 import streamlit as st
-import requests
+import google.generativeai as genai
 
-st.set_page_config(page_title="SCM AI Assistant", page_icon="🚚")
+# 1. Page Configuration
+st.set_page_config(
+    page_title="SCM AI Assistant", 
+    page_icon="🚚", 
+    layout="centered"
+)
 
 st.title("🚚 SCM AI Assistant")
+st.markdown("Your specialized assistant for Supply Chain, Logistics, and Inventory Management.")
 
-# 1. Access the API Key
-api_key = st.secrets["GROQ_API_KEY"]
-url = "https://api.groq.com/openai/v1/chat/completions"
-SYSTEM_PROMPT = "You are a Supply Chain Management assistant. Answer simply and professionally."
+# 2. Secure API Configuration
+# This pulls the key from Streamlit Cloud's "Secrets" manager
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("Missing API Key! Please add 'GEMINI_API_KEY' to your Streamlit Secrets.")
+    st.stop()
 
-# 2. Initialize Session State
+# 3. Model Initialization
+# We use gemini-1.5-flash for speed and efficiency
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    system_instruction="You are a Supply Chain Management assistant. Answer simply, professionally, and provide actionable SCM insights."
+)
+
+# 4. Session State for Chat History
+# This ensures the chat doesn't disappear when the app reruns
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "system", "content": SYSTEM_PROMPT}
-    ]
+    st.session_state.messages = []
 
-# 3. Display Chat History (skipping the system prompt)
-for msg in st.session_state.messages[1:]:
+if "chat_session" not in st.session_state:
+    # persistent chat object handles conversation memory
+    st.session_state.chat_session = model.start_chat(history=[])
+
+# 5. Display Existing Chat History
+for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+        st.markdown(msg["content"])
 
-# 4. Define the API Interaction Logic
-def ask_ai(question):
-    st.session_state.messages.append({"role": "user", "content": question})
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "llama3-8b-8192",
-        "messages": st.session_state.messages
-    }
-
-    try:
-        res = requests.post(url, headers=headers, json=payload)
-        res.raise_for_status() 
-        data = res.json()
-        
-        if "choices" in data:
-            answer = data["choices"][0]["message"]["content"]
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-            return answer
-        else:
-            return f"API Error: {data.get('error', 'Unknown error format')}"
-
-    except requests.exceptions.RequestException as e:
-        return f"Connection Error: {str(e)}"
-
-# 5. Handle User Input
-user_input = st.chat_input("Ask about supply chain logistics, inventory, etc...")
+# 6. User Input Logic
+user_input = st.chat_input("Ask a supply chain question (e.g., How to optimize safety stock?)")
 
 if user_input:
-    # Immediately show the user's message
+    # Display user's message immediately
+    st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
-        st.write(user_input)
+        st.markdown(user_input)
 
-    # Get the AI response
+    # Generate and display AI response
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."): # Added a nice loading spinner
-            reply = ask_ai(user_input)
-            st.write(reply)
+        with st.spinner("Analyzing data..."):
+            try:
+                # Send message to the Gemini API
+                response = st.session_state.chat_session.send_message(user_input)
+                full_response = response.text
+                
+                st.markdown(full_response)
+                
+                # Save to history
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+
+# 7. Sidebar Utilities
+with st.sidebar:
+    st.header("Settings")
+    if st.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.session_state.chat_session = model.start_chat(history=[])
+        st.rerun()
+    
+    st.info("Powered by Google Gemini 1.5 Flash")
