@@ -5,71 +5,82 @@ st.set_page_config(page_title="SCM AI Assistant", page_icon="🚚")
 
 st.title("🚚 SCM AI Assistant")
 
-API_KEY = st.secrets["GEMINI_API_KEY"]
+# -------- API KEY --------
+api_key = st.secrets.get("GEMINI_API_KEY", "")
 
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={API_KEY}"
+if not api_key:
+    st.error("API Key Missing")
+    st.stop()
 
-SYSTEM_PROMPT = "You are a Supply Chain Management assistant. Answer simply."
+url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
 
 # -------- CHAT MEMORY --------
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = ""
+
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "user", "content": SYSTEM_PROMPT}
-    ]
+    st.session_state.messages = []
 
 # -------- SHOW CHAT --------
-for msg in st.session_state.messages[1:]:
+for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# -------- RESPONSE FUNCTION --------
+# -------- GEMINI FUNCTION --------
 def ask_gemini(question):
 
-    st.session_state.messages.append(
-        {"role": "user", "content": question}
+    # build prompt like CFO project
+    prompt = f"""
+    You are a Supply Chain Management assistant.
+
+    Previous Conversation:
+    {st.session_state.chat_history}
+
+    User Question:
+    {question}
+    """
+
+    res = requests.post(
+        url,
+        json={"contents":[{"parts":[{"text":prompt}]}]}
     )
 
-    payload = {
-        "contents": [
-            {
-                "parts": [{"text": question}]
-            }
-        ]
-    }
+    data = res.json()
 
-    response = requests.post(API_URL, json=payload)
-    data = response.json()
+    answer = data["candidates"][0]["content"]["parts"][0]["text"]
 
-    # simple safe read
-    try:
-        reply = data["candidates"][0]["content"]["parts"][0]["text"]
-    except:
-        reply = "Please try again."
+    # save history
+    st.session_state.chat_history += f"\nUser: {question}\nAssistant: {answer}"
 
-    st.session_state.messages.append(
-        {"role": "assistant", "content": reply}
-    )
-
-    return reply
+    return answer
 
 
 # -------- USER INPUT --------
 user_input = st.chat_input("Ask SCM question...")
 
 if user_input:
+    st.session_state.messages.append(
+        {"role":"user","content":user_input}
+    )
+
     with st.chat_message("user"):
         st.write(user_input)
 
-    answer = ask_gemini(user_input)
+    reply = ask_gemini(user_input)
+
+    st.session_state.messages.append(
+        {"role":"assistant","content":reply}
+    )
 
     with st.chat_message("assistant"):
-        st.write(answer)
+        st.write(reply)
+
 
 # -------- SUGGESTED QUESTIONS --------
 st.divider()
 st.subheader("Suggested Questions")
 
-questions = [
+suggestions = [
     "What causes delivery delays?",
     "How to reduce logistics cost?",
     "What are SCM KPIs?",
@@ -78,12 +89,22 @@ questions = [
 
 cols = st.columns(2)
 
-for i, q in enumerate(questions):
+for i, q in enumerate(suggestions):
     if cols[i % 2].button(q):
+
+        st.session_state.messages.append(
+            {"role":"user","content":q}
+        )
+
         with st.chat_message("user"):
             st.write(q)
 
-        answer = ask_gemini(q)
+        reply = ask_gemini(q)
+
+        st.session_state.messages.append(
+            {"role":"assistant","content":reply}
+        )
 
         with st.chat_message("assistant"):
-            st.write(answer)
+            st.write(reply)
+
