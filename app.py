@@ -1,26 +1,28 @@
 import streamlit as st
-from openai import OpenAI
+import google.generativeai as genai
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="SCM AI Assistant", page_icon="🚚")
+st.set_page_config(page_title="SCM Gemini Assistant", page_icon="🚚")
 
-st.title("🚚 Supply Chain AI Assistant")
+st.title("🚚 SCM AI Assistant (Gemini)")
 
-# ---------------- OPENAI CLIENT ----------------
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# ---------------- GEMINI CONFIG ----------------
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ---------------- SYSTEM ROLE ----------------
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+# ---------------- SYSTEM PROMPT ----------------
 SYSTEM_PROMPT = """
-You are an expert Supply Chain Management assistant.
-Keep conversation natural and continuous.
-Remember previous discussion context.
-Explain SCM concepts simply and professionally.
+You are a Supply Chain Management expert assistant.
+Keep conversation continuous and remember previous context.
+Explain logistics, inventory, warehouse and supply chain
+concepts in simple professional language.
 """
 
 # ---------------- SESSION MEMORY ----------------
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "system", "content": SYSTEM_PROMPT}
+        {"role": "user", "content": SYSTEM_PROMPT}
     ]
 
 # ---------------- DISPLAY CHAT HISTORY ----------------
@@ -28,22 +30,21 @@ for msg in st.session_state.messages[1:]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ---------------- FUNCTION TO GET AI RESPONSE ----------------
+# ---------------- FUNCTION FOR RESPONSE ----------------
 def generate_response(user_text):
 
-    # save user message
     st.session_state.messages.append(
         {"role": "user", "content": user_text}
     )
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=st.session_state.messages
-    )
+    # Build conversation history
+    history = ""
+    for m in st.session_state.messages:
+        history += f"{m['role']}: {m['content']}\n"
 
-    reply = response.choices[0].message.content
+    response = model.generate_content(history)
+    reply = response.text
 
-    # save assistant reply
     st.session_state.messages.append(
         {"role": "assistant", "content": reply}
     )
@@ -62,7 +63,6 @@ if user_input:
 
     with st.chat_message("assistant"):
         st.markdown(reply)
-
 
 # ---------------- SUGGESTED QUESTIONS ----------------
 st.divider()
