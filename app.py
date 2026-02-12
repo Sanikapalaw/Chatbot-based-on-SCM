@@ -1,58 +1,56 @@
 import streamlit as st
 
-st.set_page_config(page_title="SCM Expert (No API)", page_icon="🚚")
+st.set_page_config(page_title="SCM Interactive Bot", page_icon="🚚")
 
-st.title("🚚 SCM Expert Bot")
-st.markdown("This bot runs locally and does **not** require an API key.")
-
-# 1. Your 10 Question-and-Answer Knowledge Base
-scm_knowledge = {
-    "what is scm": "Supply Chain Management (SCM) is the oversight of materials, information, and finances as they move from supplier to manufacturer to wholesaler to retailer to consumer.",
-    "jit": "Just-in-Time (JIT) is an inventory strategy that aligns raw-material orders from suppliers directly with production schedules to increase efficiency.",
-    "bullwhip effect": "The bullwhip effect is a distribution channel phenomenon where demand fluctuations at the retail level cause progressively larger fluctuations at the wholesale, distributor, and manufacturer levels.",
-    "safety stock": "Safety stock is extra inventory held to prevent stockouts caused by fluctuations in supply and demand.",
-    "lead time": "Lead time is the latency between the initiation and completion of a process (e.g., the time from order placement to delivery).",
-    "3pl": "3PL (Third-Party Logistics) is outsourcing e-commerce logistics processes to a third-party business, including inventory management, warehousing, and fulfillment.",
-    "abc analysis": "ABC analysis is an inventory categorization technique that divides items into three categories (A, B, and C) based on their importance and value.",
-    "procurement": "Procurement is the act of obtaining goods or services, typically for business purposes.",
-    "reverse logistics": "Reverse logistics is the process of moving goods from their typical final destination for the purpose of capturing value, or proper disposal.",
-    "logistics": "Logistics is the part of the supply chain that plans, implements, and controls the efficient flow and storage of goods and services."
+# 1. Initialize the Knowledge Base
+scm_faq = {
+    "What is the Bullwhip Effect?": "The bullwhip effect is when small changes in consumer demand cause larger and larger swings in inventory orders as you move up the supply chain.",
+    "What is JIT (Just-In-Time)?": "JIT is an inventory strategy to increase efficiency by receiving goods only as they are needed in the production process, reducing storage costs.",
+    "What is Safety Stock?": "Safety stock is extra inventory held as a buffer to prevent stockouts caused by unpredictable demand or supply delays.",
+    "What is 3PL (Third-Party Logistics)?": "3PL is outsourcing your distribution, warehousing, and fulfillment to a specialized service provider like FedEx or DHL.",
+    "What is Reverse Logistics?": "Reverse logistics is the process of moving goods from their final destination back to the seller for returns, recycling, or disposal."
 }
 
-# 2. Initialize Chat History
+# 2. Initialize Session State
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! I am your offline SCM assistant. Ask me about JIT, Lead Time, or the Bullwhip Effect!"}
-    ]
+    st.session_state.messages = []
+    st.session_state.first_run = True
 
-# 3. Display Chat History
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# 3. Greeting Logic
+if st.session_state.first_run:
+    greeting = "How can I help you today? Please select an SCM topic below or type your own question!"
+    st.session_state.messages.append({"role": "assistant", "content": greeting})
+    st.session_state.first_run = False
 
-# 4. Handle User Input
-if user_input := st.chat_input("Ask a question..."):
-    # Display user message
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
+# 4. Display Chat History
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-    # Simple Logic: Check if any keyword from our dictionary is in the user's input
-    user_query = user_input.lower()
-    response = "I'm sorry, I only know the 10 core SCM concepts right now. Try asking about 'JIT', 'Safety Stock', or 'Bullwhip Effect'!"
+# 5. Display 5 Clickable Options
+st.write("### Quick Questions:")
+cols = st.columns(1) # You can change this to 2 or 3 for a grid look
+selected_question = None
+
+for question in scm_faq.keys():
+    if st.button(question, use_container_width=True):
+        selected_question = question
+
+# 6. Process the Choice or Manual Input
+user_input = st.chat_input("Or type your own question here...")
+
+# If they clicked a button, treat it as their input
+final_input = selected_question if selected_question else user_input
+
+if final_input:
+    # Add User Message
+    st.session_state.messages.append({"role": "user", "content": final_input})
     
-    for key in scm_knowledge:
-        if key in user_query:
-            response = scm_knowledge[key]
-            break
-
-    # Display assistant response
-    with st.chat_message("assistant"):
-        st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-# 5. Sidebar Utility
-with st.sidebar:
-    if st.button("Clear Chat"):
-        st.session_state.messages = []
-        st.rerun()
+    # Generate Answer
+    answer = scm_faq.get(final_input, "I'm sorry, I'm still learning! Try clicking one of the 5 options above.")
+    
+    # Add Assistant Message
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+    
+    # Rerun to show the new messages immediately
+    st.rerun()
