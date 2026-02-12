@@ -1,56 +1,77 @@
 import streamlit as st
 
-st.set_page_config(page_title="SCM Interactive Bot", page_icon="🚚")
+st.set_page_config(page_title="Dynamic SCM Bot", page_icon="🚚")
 
-# 1. Initialize the Knowledge Base
-scm_faq = {
-    "What is the Bullwhip Effect?": "The bullwhip effect is when small changes in consumer demand cause larger and larger swings in inventory orders as you move up the supply chain.",
-    "What is JIT (Just-In-Time)?": "JIT is an inventory strategy to increase efficiency by receiving goods only as they are needed in the production process, reducing storage costs.",
-    "What is Safety Stock?": "Safety stock is extra inventory held as a buffer to prevent stockouts caused by unpredictable demand or supply delays.",
-    "What is 3PL (Third-Party Logistics)?": "3PL is outsourcing your distribution, warehousing, and fulfillment to a specialized service provider like FedEx or DHL.",
-    "What is Reverse Logistics?": "Reverse logistics is the process of moving goods from their final destination back to the seller for returns, recycling, or disposal."
+# 1. Define the Branching Knowledge Base
+# Format: { "Trigger": ("Answer", ["Follow-up 1", "Follow-up 2", ...]) }
+scm_branches = {
+    "START": ("How can I help you today? Select a major supply chain area to explore:", 
+              ["Procurement", "Inventory", "Logistics"]),
+    
+    "Procurement": ("Procurement is about sourcing goods. What specifically interests you?", 
+                    ["Vendor Selection", "Negotiation Tips", "Purchase Orders"]),
+    
+    "Inventory": ("Inventory management balances cost and availability. Want to learn about:", 
+                  ["JIT Strategy", "Safety Stock", "ABC Analysis"]),
+    
+    "Logistics": ("Logistics covers movement and storage. Choose a sub-topic:", 
+                  ["3PL Services", "Route Optimization", "Reverse Logistics"]),
+    
+    # Deep Branches (Level 2)
+    "JIT Strategy": ("Just-In-Time (JIT) reduces waste by receiving goods only as needed. It requires high supplier reliability.", ["Back to Inventory", "Home"]),
+    "Safety Stock": ("Safety stock is your 'insurance' inventory for demand spikes.", ["Back to Inventory", "Home"]),
+    "3PL Services": ("3PL providers handle your shipping and warehousing so you can focus on sales.", ["Back to Logistics", "Home"]),
+    "Home": ("Returning to start...", ["Procurement", "Inventory", "Logistics"])
 }
 
-# 2. Initialize Session State
+# Mapping for "Back" buttons to keep it clean
+back_map = {"Back to Inventory": "Inventory", "Back to Logistics": "Logistics"}
+
+# 2. Initialize State
+if "current_step" not in st.session_state:
+    st.session_state.current_step = "START"
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.first_run = True
 
-# 3. Greeting Logic
-if st.session_state.first_run:
-    greeting = "How can I help you today? Please select an SCM topic below or type your own question!"
-    st.session_state.messages.append({"role": "assistant", "content": greeting})
-    st.session_state.first_run = False
+# 3. Handle Button Clicks
+def handle_click(choice):
+    # Determine the next step
+    next_step = back_map.get(choice, choice)
+    st.session_state.current_step = next_step
+    
+    # Add to chat history
+    answer, _ = scm_branches.get(next_step, ("I'm not sure about that.", []))
+    st.session_state.messages.append({"role": "user", "content": choice})
+    st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# 4. Display Chat History
+# 4. UI Layout
+st.title("🚚 Dynamic SCM Assistant")
+
+# Display History
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# 5. Display 5 Clickable Options
-st.write("### Quick Questions:")
-cols = st.columns(1) # You can change this to 2 or 3 for a grid look
-selected_question = None
+# 5. Display Dynamic Buttons
+current_text, options = scm_branches[st.session_state.current_step]
 
-for question in scm_faq.keys():
-    if st.button(question, use_container_width=True):
-        selected_question = question
+if st.session_state.current_step == "START":
+    with st.chat_message("assistant"):
+        st.write(current_text)
 
-# 6. Process the Choice or Manual Input
-user_input = st.chat_input("Or type your own question here...")
+st.write("---")
+st.write("### Choose an option:")
+cols = st.columns(len(options))
 
-# If they clicked a button, treat it as their input
-final_input = selected_question if selected_question else user_input
+for i, option in enumerate(options):
+    with cols[i]:
+        if st.button(option, key=option):
+            handle_click(option)
+            st.rerun()
 
-if final_input:
-    # Add User Message
-    st.session_state.messages.append({"role": "user", "content": final_input})
-    
-    # Generate Answer
-    answer = scm_faq.get(final_input, "I'm sorry, I'm still learning! Try clicking one of the 5 options above.")
-    
-    # Add Assistant Message
-    st.session_state.messages.append({"role": "assistant", "content": answer})
-    
-    # Rerun to show the new messages immediately
-    st.rerun()
+# 6. Sidebar Reset
+with st.sidebar:
+    if st.button("Restart Bot"):
+        st.session_state.current_step = "START"
+        st.session_state.messages = []
+        st.rerun()
