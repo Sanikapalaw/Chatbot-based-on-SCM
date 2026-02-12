@@ -1,11 +1,13 @@
 import streamlit as st
 import requests
+import time
 
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="SCM AI Assistant", page_icon="🚚")
 
 st.title("🚚 SCM AI Assistant")
 
-# -------- API KEY --------
+# ---------------- API KEY ----------------
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 
 if not api_key:
@@ -14,31 +16,36 @@ if not api_key:
 
 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
 
-# -------- CHAT MEMORY --------
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = ""
+SYSTEM_PROMPT = "You are a Supply Chain Management assistant. Answer simply and professionally."
 
+# ---------------- SESSION MEMORY ----------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# -------- SHOW CHAT --------
+# ---------------- SHOW CHAT ----------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# -------- GEMINI FUNCTION --------
+# ---------------- GEMINI FUNCTION ----------------
 def ask_gemini(question):
 
-    # build prompt like CFO project
+    # send only last 4 messages (stable for free API)
+    history = ""
+    for m in st.session_state.messages[-4:]:
+        history += f"{m['role']}: {m['content']}\n"
+
     prompt = f"""
-    You are a Supply Chain Management assistant.
+    {SYSTEM_PROMPT}
 
-    Previous Conversation:
-    {st.session_state.chat_history}
+    Previous conversation:
+    {history}
 
-    User Question:
+    User question:
     {question}
     """
+
+    time.sleep(1)  # avoid rate limit
 
     res = requests.post(
         url,
@@ -47,18 +54,19 @@ def ask_gemini(question):
 
     data = res.json()
 
-    answer = data["candidates"][0]["content"]["parts"][0]["text"]
-
-    # save history
-    st.session_state.chat_history += f"\nUser: {question}\nAssistant: {answer}"
+    if "candidates" in data:
+        answer = data["candidates"][0]["content"]["parts"][0]["text"]
+    else:
+        answer = "Gemini is busy. Please wait a few seconds and try again."
 
     return answer
 
 
-# -------- USER INPUT --------
+# ---------------- USER INPUT ----------------
 user_input = st.chat_input("Ask SCM question...")
 
 if user_input:
+
     st.session_state.messages.append(
         {"role":"user","content":user_input}
     )
@@ -76,13 +84,13 @@ if user_input:
         st.write(reply)
 
 
-# -------- SUGGESTED QUESTIONS --------
+# ---------------- SUGGESTED QUESTIONS ----------------
 st.divider()
 st.subheader("Suggested Questions")
 
 suggestions = [
     "What causes delivery delays?",
-    "How to reduce logistics cost?",
+    "How to reduce transportation cost?",
     "What are SCM KPIs?",
     "Explain demand forecasting"
 ]
@@ -107,4 +115,3 @@ for i, q in enumerate(suggestions):
 
         with st.chat_message("assistant"):
             st.write(reply)
-
